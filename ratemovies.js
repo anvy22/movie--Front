@@ -1,106 +1,92 @@
-document.addEventListener("DOMContentLoaded", function() {
-   
-    document.querySelector('.loader').style.display = 'none';
-  });
+document.addEventListener("DOMContentLoaded", function () {
+    const loader = document.querySelector('.loader');
+    if (loader) loader.style.display = 'none';
+});
 
 const homeButton = document.getElementById("home");
-
-  
-  if (homeButton) {
-    
-    homeButton.addEventListener("click", function() {
-      
+if (homeButton) {
+    homeButton.addEventListener("click", function () {
         window.location.replace("home.html");
     });
-  } else {
+} else {
     console.error("Button with ID 'home' not found!");
-  }
+}
 
-  const input = document.getElementById('input');
-  const searchIcon = document.querySelector('.labelforsearch');
-  const micButton = document.querySelector('.micButton');
-  
-  
-  
-  
-  searchIcon.addEventListener('click', () => { 
+const input = document.getElementById('input');
+const searchIcon = document.querySelector('.labelforsearch');
+const micButton = document.querySelector('.micButton');
 
-      
+if (searchIcon) {
+    searchIcon.addEventListener('click', () => {
+        searchMovie();
+        const loader = document.querySelector('.loader');
+        if (loader) loader.style.display = 'block';
+    });
+} else {
+    console.error("Element with class 'labelforsearch' not found!");
+}
 
-      searchMovie()
-      document.querySelector('.loader').style.display = 'block';
-      
-     
-  });
-  
-  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-  if (SpeechRecognition) {
-    // Create a new speech recognition instance
+const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+if (SpeechRecognition && micButton) {
     const recognition = new SpeechRecognition();
+    recognition.lang = 'en-US';
+    recognition.interimResults = false;
+    recognition.maxAlternatives = 1;
 
-    // Set some properties
-    recognition.lang = 'en-US';  // Language for recognition (e.g., US English)
-    recognition.interimResults = false;  // Only return final results
-    recognition.maxAlternatives = 1;  // Limit to one result
-
-    // Event handler for microphone button click
     micButton.addEventListener('click', () => {
         console.log('Microphone button clicked.');
-
-        // Start speech recognition
         recognition.start();
         console.log('Speech recognition started');
     });
 
-    // When speech is recognized, show it in the output span
     recognition.onresult = (event) => {
         const transcript = event.results[0][0].transcript;
-        // Display the recognized text
         console.log(`Recognized: ${transcript}`);
         searchMovie(transcript);
     };
 
-    // Error handler for speech recognition
     recognition.onerror = (event) => {
         console.error('Speech recognition error:', event.error);
     };
-
-} else {
-    // If the browser doesn't support SpeechRecognition
+} else if (!SpeechRecognition) {
     alert("Sorry, your browser doesn't support the Web Speech API.");
 }
- 
- 
 
 async function searchMovie(voice) {
-    const searchTerm = document.getElementById('search-movie').value||voice;
-    document.getElementById('search-movie').value = voice;
-    console.log(searchTerm);
-    
-    // Send search term to backend
-    const response = await fetch('https://movieb-tmxl.onrender.com/search-movie', {  // Updated URL
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ movieName: searchTerm }),
-    });
+    const inputElement = document.getElementById('search-movie');
+    const searchTerm = inputElement?.value || voice;
 
-    // Check for a successful response
-    if (!response.ok) {
-        document.querySelector('.loader').style.display = 'none';
-        const errorText = await response.text();  // Get the response text in case of an error
-        console.error(`Error: ${response.status} - ${errorText}`);
-        return;  // Exit the function if the response was not OK
+    if (!searchTerm) {
+        alert("Please enter a search term.");
+        return;
     }
 
-    const movieDataArray = await response.json();
-    
-    // Clear previous search results
-    document.getElementById('search-results').innerHTML = '';
+    if (voice) inputElement.value = voice; // Update input field with voice input
 
-    // Display multiple movie cards
-    movieDataArray.forEach(movie => displayMovieCard(movie));
+    try {
+        const response = await fetch('https://movieb-tmxl.onrender.com/search-movie', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ movieName: searchTerm }),
+        });
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(errorText || `Error: ${response.status}`);
+        }
+
+        const movieDataArray = await response.json();
+        const searchResults = document.getElementById('search-results');
+        if (searchResults) searchResults.innerHTML = ''; // Clear previous results
+
+        movieDataArray.forEach(movie => displayMovieCard(movie));
+    } catch (error) {
+        console.error("Error fetching movies:", error);
+        alert("Failed to fetch movies. Please try again.");
+    } finally {
+        const loader = document.querySelector('.loader');
+        if (loader) loader.style.display = 'none';
+    }
 }
 
 function displayMovieCard(movie) {
@@ -110,16 +96,18 @@ function displayMovieCard(movie) {
         <img src="${movie.poster}" alt="Movie Poster">
         <h3>${movie.title}</h3>
         <p>Release Year: ${movie.releaseYear}</p>
-        <p>Actors: ${movie.actors.join(', ')}</p>
-        <button onclick="showRatingCard('${movie.id}', '${movie.title}', '${movie.poster}', '${movie.releaseYear}', '${movie.actors.join(', ')}')">Rate</button>
+        <p>Actors: ${movie.actors ? movie.actors.join(', ') : 'No cast information available'}</p>
+        <button onclick="showRatingCard('${movie.id}', '${movie.title}', '${movie.poster}', '${movie.releaseYear}', '${movie.actors ? movie.actors.join(', ') : ''}')">Rate</button>
         <button onclick="showWatchList('${movie.id}', '${movie.title}', '${movie.poster}', '${movie.releaseYear}')">Add To WatchList</button>
     `;
     document.getElementById('search-results').appendChild(result);
 }
 
-
-
 function showRatingCard(movieid, title, poster, releaseyear, actors) {
+    if (document.querySelector('.popup')) {
+        document.querySelector('.popup').remove();
+    }
+
     const result = document.createElement('div');
     result.classList.add('popup');
     result.innerHTML = `
@@ -146,134 +134,97 @@ function showRatingCard(movieid, title, poster, releaseyear, actors) {
         </div>
     `;
 
-    // Initially hide the Save button
     const saveButton = result.querySelector("#saveBtn");
     saveButton.style.display = "none";
 
-    // Add event listeners to monitor the review and rating inputs
     const reviewInput = result.querySelector("#review");
     const ratingInputs = result.querySelectorAll('input[name="rating"]');
 
-    // Function to check if both review and rating are filled
     function checkInputs() {
         const review = reviewInput.value.trim();
         const rating = Array.from(ratingInputs).some(radio => radio.checked);
         if (review && rating) {
-            saveButton.style.display = "inline-block"; // Show Save button
+            saveButton.style.display = "inline-block";
         } else {
-            saveButton.style.display = "none"; // Hide Save button
+            saveButton.style.display = "none";
         }
     }
 
-    // Event listeners for review input and rating selection
     reviewInput.addEventListener("input", checkInputs);
-    ratingInputs.forEach(input => {
-        input.addEventListener("change", checkInputs);
-    });
+    ratingInputs.forEach(input => input.addEventListener("change", checkInputs));
 
-    // Append the result to the body
     document.body.appendChild(result);
-    console.log("this is userid:",)
 }
-
-
-
 
 function cancelPopup() {
     const popup = document.querySelector('.popup');
-    if (popup) {
-        popup.remove();
-    }
+    if (popup) popup.remove();
 }
 
-
 async function pushData(movieid, title, poster, releaseyear, actors) {
-    const review = document.getElementById('review').value.trim(); // Get review from textarea
-    const rating = document.querySelector('input[name="rating"]:checked')?.value; // Get rating from checked radio
-    console.log(review,rating);
+    const review = document.getElementById('review').value.trim();
+    const rating = document.querySelector('input[name="rating"]:checked')?.value;
     const userid = localStorage.getItem('userid');
-    console.log(userid);
+
+    if (!userid) {
+        alert("User is not logged in. Please log in to continue.");
+        return;
+    }
+
     if (!review || !rating) {
         alert("Please provide both a review and rating!");
         return;
     }
 
-    // Prepare the data to be sent to the backend
-    const movieData = {
-        movieid: movieid,
-        title: title,
-        poster: poster,
-        releaseyear: releaseyear,
-        actors: actors,
-        review: review,
-        rating: rating,
-        userid: userid
-    };
+    const movieData = { movieid, title, poster, releaseyear, actors, review, rating, userid };
 
     try {
-        // Make the POST request to the backend using await
         const response = await fetch('https://movieb-tmxl.onrender.com/rate-movie', {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(movieData) // Send the movie data as a JSON string
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(movieData),
         });
 
-        const data = await response.json(); // Wait for the response and parse it as JSON
-
-        if (response.ok) {
-            console.log("Movie data saved:", data);
-           
-            cancelPopup(); // Close the popup after saving
-        } else {
-            throw new Error(data.message || "Failed to save the review.");
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(errorText);
         }
+
+        const data = await response.json();
+        console.log("Movie data saved:", data);
+        cancelPopup();
     } catch (error) {
         console.error("Error saving movie data:", error);
         alert("Failed to save the review.");
-         
     }
 }
 
-async function showWatchList(movieid,title,poster, releaseYear)
-{
+async function showWatchList(movieid, title, poster, releaseYear) {
+    const userid = localStorage.getItem('userid');
 
-     const userid = localStorage.getItem('userid');
-      const watchData = {
-        movieid: movieid,
-        title:title,
-        poster:poster,
-        releaseYear:releaseYear,
-        userid:userid
-
-      };
-
-
-    try {
-        // Make the POST request to the backend using await
-        const response = await fetch('https://movieb-tmxl.onrender.com/watchlist', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(watchData) // Send the movie data as a JSON string
-        });
-
-        const data = await response.json(); // Wait for the response and parse it as JSON
-
-        if (response.ok) {
-            console.log("watchlist data saved:", data);
-           
-            cancelPopup(); // Close the popup after saving
-        } else {
-            throw new Error(data.message || "Failed adding to watchlist");
-        }
-    } catch (error) {
-        console.error("Error adding to watchlist", error);
-        alert("Failed adding to watchlist");
-         
+    if (!userid) {
+        alert("User is not logged in. Please log in to continue.");
+        return;
     }
 
+    const watchData = { movieid, title, poster, releaseYear, userid };
 
+    try {
+        const response = await fetch('https://movieb-tmxl.onrender.com/watchlist', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(watchData),
+        });
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(errorText);
+        }
+
+        const data = await response.json();
+        console.log("Watchlist data saved:", data);
+    } catch (error) {
+        console.error("Error adding to watchlist", error);
+        alert("Failed to add to watchlist.");
+    }
 }
