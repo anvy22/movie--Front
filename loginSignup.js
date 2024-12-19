@@ -85,8 +85,8 @@ document.addEventListener('DOMContentLoaded', () => {
             const data = await response.json();
             console.log("this is data:", data);
             if (response.ok) {
-                console.log("Login successful!", data.userid);
-                localStorage.setItem('userid', data.userid);  // Store userId in localStorage
+                console.log("Login successful!", data.userId);
+                localStorage.setItem('userid', data.userId);  // Store userId in localStorage
                 window.location.replace("home.html");
             } else {
                 alert(data.message || 'Login failed');
